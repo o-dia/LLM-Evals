@@ -1,0 +1,13 @@
+{
+  "name": "llm-evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@8",
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm -r build",
+    "lint": "echo 'add lints here'",
+    "evals": "pnpm --filter evals run"
+  }
+}

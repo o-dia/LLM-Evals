@@ -1,0 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+:root {
+  font-family: "Space Grotesk", "Segoe UI", "Trebuchet MS", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --font-display: "Fraunces", "Georgia", serif;
+  --bg: #f7f2e9;
+  --surface: #fff8ef;
+  --surface-muted: #f3eadf;
+  --ink: #1d1b18;
+  --muted: #6b6258;
+  --accent: #e4572e;
+  --border: rgba(125, 109, 93, 0.2);
+  --shadow-soft: 0 18px 40px rgba(69, 53, 38, 0.08);
+  --shadow-strong: 0 25px 60px rgba(69, 53, 38, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background: radial-gradient(circle at 15% 20%, #fff4e3 0%, transparent 45%),
+    radial-gradient(circle at 85% 10%, #eaf4f2 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, #fdebd4 0%, transparent 55%),
+    var(--bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

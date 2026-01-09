@@ -1,0 +1,245 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  padding: clamp(1.5rem, 3vw, 3rem);
+}
+
+.hero {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  align-items: stretch;
+}
+
+.hero__content {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 2.5vw, 2.5rem);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border);
+}
+
+.hero__content h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 2.6vw, 2.7rem);
+  margin: 0.6rem 0 1rem;
+}
+
+.hero__content p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.hero__panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.panel-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+}
+
+.panel-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.panel-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0 0;
+  display: grid;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+
+.content {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel__header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+}
+
+.panel__header p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.panel__body {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.form input,
+.form textarea,
+.form select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface-muted);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form input:focus,
+.form textarea:focus,
+.form select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(228, 87, 46, 0.2);
+}
+
+.form button {
+  justify-self: start;
+}
+
+button {
+  border: none;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 18px rgba(228, 87, 46, 0.3);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.list {
+  display: grid;
+  gap: 1rem;
+}
+
+.list-item {
+  background: var(--surface-muted);
+  border-radius: 16px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+}
+
+.list-item h4 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.list-item p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.meta {
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.8rem;
+  align-self: center;
+}
+
+.tag {
+  display: inline-flex;
+  margin-top: 0.7rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(42, 157, 143, 0.12);
+  color: #1c6b62;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.alert {
+  background: rgba(228, 87, 46, 0.12);
+  border: 1px solid rgba(228, 87, 46, 0.3);
+  color: #7f2e19;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+}
+
+.fade-in {
+  animation: floatIn 0.6s ease forwards;
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+@keyframes floatIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .meta {
+    text-align: left;
+  }
+}

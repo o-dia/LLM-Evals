@@ -8,6 +8,11 @@
     "dev:api": "pnpm --filter api dev",
     "build": "pnpm -r build",
     "lint": "echo 'add lints here'",
-    "evals": "pnpm --filter evals run"
+    "evals": "pnpm --filter evals run",
+    "test": "pnpm --filter api test"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
   }
 }

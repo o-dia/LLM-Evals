@@ -13,17 +13,21 @@ This doc captures the phased plan for evolving the repo from a policy adapter + 
 - [x] Add API CRUD endpoints for policies, suites, cases
 - [x] Build UI shell (model selector, policies list, suites list)
 - [x] Add seed script for sample data
+- [x] Add Ollama model listing + pull workflow
 
 ## Phase 2: Policy to test case workflow
 - [ ] Upload policy documents
 - [ ] Use the selected model to draft test cases
 - [ ] UI editor for reviewing and editing cases
 - [ ] Save approved cases to Postgres
+- [x] Import built-in suites from JSONL into Postgres
+- [x] Curated built-in suites list in the UI
 
 ## Phase 3: Eval execution and results
 - [x] Run cases through the gateway from the API
 - [x] Store run results (violations, status, traces)
-- [ ] UI results table with filters and comparisons
+- [x] UI results table with filters and comparisons
+- [x] Dedicated results page with run progress + timestamps
 - [ ] Export runs to JSONL for CLI parity
 
 ## Phase 4: Data curation for fine-tuning

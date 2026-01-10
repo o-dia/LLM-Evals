@@ -49,6 +49,9 @@ The gateway forwards to an upstream that speaks OpenAI-style `/v1/chat/completio
 By default we target:
 - `http://127.0.0.1:11434` (Ollama)
 
+The API also exposes Ollama management helpers so the UI can list installed models,
+pull from the public catalog, and trigger `ollama pull` without the user leaving the app.
+
 ## Data flow (interactive UI)
 1) User selects an Ollama model.
 2) User uploads a policy document.

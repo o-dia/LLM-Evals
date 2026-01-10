@@ -56,6 +56,27 @@ Data flow:
    - `pnpm --filter evals run http://localhost:3000 <model> <suite>`
      - Example: `pnpm --filter evals run http://localhost:3000 llama3.1 pii`
 
+## Local dev (UI + API)
+You will typically use two terminals: one for the API gateway and one for the UI.
+
+1) Ensure Postgres is running and the dev DB exists:
+   - `createdb llm_evals` (one-time)
+2) Configure the API gateway:
+   - Copy `apps/api/.env.example` to `apps/api/.env`
+   - Fill in `DB_*` values (use `DB_NAME=llm_evals`)
+3) Terminal 1 (API):
+   - `pnpm install`
+   - `pnpm dev:api`
+4) Terminal 2 (UI):
+   - `cd apps/web`
+   - `pnpm install`
+   - `pnpm dev`
+5) Visit the UI:
+   - `http://localhost:5173`
+
+Optional: seed sample data
+- `pnpm --filter api run seed`
+
 ## How to think about “downloading and running the open-source model”
 
 This repo does **not** “import model weights” as a library dependency.

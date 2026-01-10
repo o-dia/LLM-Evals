@@ -25,9 +25,20 @@ If your Ollama setup does not, you can either:
 4) Run gateway:
    - `pnpm dev:api`
 
+## App-managed model downloads
+The API exposes helper endpoints that proxy to Ollama so the UI can list and pull models:
+- `GET /providers/ollama/health` (checks if Ollama is reachable)
+- `GET /providers/ollama/models` (lists installed models)
+- `POST /providers/ollama/pull` with `{ "model": "<name>" }` (downloads a model)
+- `GET /providers/ollama/catalog` (lists public catalog models)
+
+The catalog endpoint proxies `https://ollama.com/api/tags` by default
+and can be overridden via `OLLAMA_CATALOG_URL`.
+
+These calls still use Ollama's local storage; the app only orchestrates.
+
 ## Model naming
 The eval runner sends a `model` field. For Ollama, this typically matches the local model name:
 - `llama3.1`
 - `mistral`
 - etc.
-

@@ -5,7 +5,7 @@ import path from "node:path";
 import { z } from "zod";
 
 const argsSchema = z.object({
-  baseUrl: z.string().default("http://localhost:3000"),
+  baseUrl: z.string().default("http://localhost:3001"),
   model: z.string().default("llama3.1"),
   suite: z.string().default("integrity")
 });

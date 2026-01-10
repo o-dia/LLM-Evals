@@ -17,6 +17,7 @@ const EnvSchema = z.object({
   DB_NAME: z.string().default("llm_evals"),
   DB_USER: z.string().optional(),
   DB_PASSWORD: z.string().optional(),
+  OLLAMA_CATALOG_URL: z.string().default("https://ollama.com/api/tags"),
   DB_SSL: z
     .union([z.literal("true"), z.literal("false")])
     .transform((value) => value === "true")
@@ -37,5 +38,6 @@ export const env = {
     user: parsed.DB_USER,
     password: parsed.DB_PASSWORD,
     ssl: parsed.DB_SSL
-  }
+  },
+  ollamaCatalogUrl: parsed.OLLAMA_CATALOG_URL
 };

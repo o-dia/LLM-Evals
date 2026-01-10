@@ -9,6 +9,21 @@ const truncateAll = async () => {
   );
 };
 
+const waitForRunCompletion = async (server: FastifyInstance, runId: string) => {
+  for (let i = 0; i < 30; i += 1) {
+    const runResponse = await server.inject({
+      method: "GET",
+      url: `/runs/${runId}`
+    });
+    const runPayload = JSON.parse(runResponse.payload);
+    if (runPayload.status === "completed") {
+      return runPayload;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Run did not complete in time");
+};
+
 describe("API routes", () => {
   let server: FastifyInstance | null = null;
 
@@ -140,11 +155,15 @@ describe("API routes", () => {
       url: "/runs",
       payload: { suite_id: suite.id, model_name: "gpt-oss-20b" }
     });
-    expect(runResponse.statusCode).toBe(200);
+    expect(runResponse.statusCode).toBe(202);
     const runPayload = JSON.parse(runResponse.payload);
-    expect(runPayload.status).toBe("completed");
-    expect(runPayload.totals.passed).toBe(2);
+    expect(runPayload.status).toBe("running");
+    expect(runPayload.total_cases).toBe(2);
 
+    const completedRun = await waitForRunCompletion(server, runPayload.id);
+    expect(completedRun.status).toBe("completed");
+    expect(completedRun.completed_cases).toBe(2);
+    expect(completedRun.passed_cases).toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const resultsResponse = await server.inject({
@@ -154,5 +173,6 @@ describe("API routes", () => {
     const resultsPayload = JSON.parse(resultsResponse.payload);
     expect(resultsPayload.data).toHaveLength(2);
     expect(resultsPayload.data.every((row: { passed: boolean }) => row.passed)).toBe(true);
+    expect(resultsPayload.data[0].prompt).toBeDefined();
   });
 });

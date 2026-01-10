@@ -1,6 +1,29 @@
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { pool } from "./db.js";
+import { env } from "./env.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const builtinSuitesDir = path.resolve(__dirname, "../../../packages/evals/suites");
+
+const builtinSuites = [
+  {
+    id: "pii",
+    name: "PII screening",
+    description: "Synthetic PII prompts for screening and leakage tests.",
+    filename: "pii.jsonl"
+  },
+  {
+    id: "integrity",
+    name: "Integrity checks",
+    description: "Prompt-injection and benign baseline cases.",
+    filename: "integrity.jsonl"
+  }
+] as const;
 
 const idParamSchema = z.object({
   id: z.string().uuid()
@@ -73,6 +96,17 @@ const runCreateSchema = z.object({
   provider: z.string().min(1).default("ollama")
 });
 
+const ollamaPullSchema = z.object({
+  model: z.string().min(1)
+});
+
+const builtinImportSchema = z.object({
+  suite: z.enum(["pii", "integrity"]),
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  policy_id: z.string().uuid().optional()
+});
+
 const suitesListQuerySchema = listQuerySchema.extend({
   policy_id: z.string().uuid().optional()
 });
@@ -124,7 +158,172 @@ const truncateText = (value: string, limit = 500) => {
   return value.slice(0, limit);
 };
 
+const buildOllamaUrl = (path: string) => new URL(path, env.upstreamBaseUrl).toString();
+
+const parseOllamaStream = (text: string) => {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const parsed = lines.map(safeJsonParse).filter((value) => value !== null);
+  const last = parsed.length > 0 ? parsed[parsed.length - 1] : null;
+  return { last, updates: parsed.slice(-5) };
+};
+
+const loadBuiltinSuiteCases = async (filename: string) => {
+  const filePath = path.join(builtinSuitesDir, filename);
+  const raw = await fs.readFile(filePath, "utf-8");
+  const cases: Array<{
+    id?: string;
+    name?: string;
+    prompt: string;
+    tags?: string[];
+    expect?: { blocked?: boolean };
+  }> = [];
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parsed = safeJsonParse(trimmed);
+    if (!parsed) continue;
+    if (typeof parsed.prompt !== "string") continue;
+    cases.push(parsed);
+  }
+
+  return cases;
+};
+
 export const registerCrudRoutes = (fastify: FastifyInstance) => {
+  fastify.get("/providers/ollama/health", async (_request, reply) => {
+    try {
+      const response = await fetch(buildOllamaUrl("/api/tags"));
+      if (!response.ok) {
+        reply.code(502);
+        return { ok: false, error: `Ollama responded with ${response.status}` };
+      }
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ollama unreachable";
+      reply.code(503);
+      return { ok: false, error: message };
+    }
+  });
+
+  fastify.get("/providers/ollama/models", async (_request, reply) => {
+    try {
+      const response = await fetch(buildOllamaUrl("/api/tags"));
+      if (!response.ok) {
+        reply.code(502);
+        return { error: "ollama_error", details: await response.text() };
+      }
+      const payload = await response.json();
+      return { models: payload?.models ?? [] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ollama unreachable";
+      reply.code(503);
+      return { error: "ollama_unreachable", details: message };
+    }
+  });
+
+  fastify.post("/providers/ollama/pull", async (request, reply) => {
+    const parsed = ollamaPullSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return formatValidationError(parsed.error);
+    }
+
+    try {
+      const response = await fetch(buildOllamaUrl("/api/pull"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: parsed.data.model })
+      });
+
+      if (!response.ok) {
+        reply.code(502);
+        return { error: "ollama_error", details: await response.text() };
+      }
+
+      const text = await response.text();
+      const { last, updates } = parseOllamaStream(text);
+      return {
+        status: last?.status ?? "unknown",
+        details: last,
+        updates
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ollama unreachable";
+      reply.code(503);
+      return { error: "ollama_unreachable", details: message };
+    }
+  });
+
+  fastify.get("/providers/ollama/catalog", async (_request, reply) => {
+    try {
+      const response = await fetch(env.ollamaCatalogUrl);
+      if (!response.ok) {
+        reply.code(502);
+        return { error: "ollama_catalog_error", details: await response.text() };
+      }
+      const payload = await response.json();
+      return { models: payload?.models ?? [] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Catalog unreachable";
+      reply.code(503);
+      return { error: "ollama_catalog_unreachable", details: message };
+    }
+  });
+
+  fastify.get("/suites/builtin", async () => {
+    return { suites: builtinSuites };
+  });
+
+  fastify.post("/suites/builtin/import", async (request, reply) => {
+    const parsed = builtinImportSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return formatValidationError(parsed.error);
+    }
+
+    const suiteMeta = builtinSuites.find((suite) => suite.id === parsed.data.suite);
+    if (!suiteMeta) {
+      reply.code(404);
+      return { error: "builtin_suite_not_found" };
+    }
+
+    const cases = await loadBuiltinSuiteCases(suiteMeta.filename);
+    if (cases.length === 0) {
+      reply.code(400);
+      return { error: "builtin_suite_empty" };
+    }
+
+    await pool.query("BEGIN");
+    try {
+      const suiteName = parsed.data.name ?? suiteMeta.name;
+      const suiteDescription = parsed.data.description ?? suiteMeta.description;
+      const suiteResult = await pool.query(
+        "INSERT INTO suites (name, description, policy_id) VALUES ($1, $2, $3) RETURNING id",
+        [suiteName, suiteDescription, parsed.data.policy_id ?? null]
+      );
+      const suiteId = suiteResult.rows[0].id as string;
+
+      for (const testCase of cases) {
+        const expectedOutcome = testCase.expect?.blocked ? "block" : "allow";
+        const expectedNotes = testCase.name ?? testCase.id ?? null;
+        const tags = JSON.stringify(testCase.tags ?? []);
+
+        await pool.query(
+          "INSERT INTO cases (suite_id, prompt, expected_outcome, expected_notes, tags) VALUES ($1, $2, $3, $4, $5::jsonb)",
+          [suiteId, testCase.prompt, expectedOutcome, expectedNotes, tags]
+        );
+      }
+
+      await pool.query("COMMIT");
+      reply.code(201);
+      return { id: suiteId, name: suiteName, cases: cases.length };
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      throw error;
+    }
+  });
+
   fastify.get("/policies", async (request, reply) => {
     const parsed = listQuerySchema.safeParse(request.query);
     if (!parsed.success) {
@@ -479,7 +678,12 @@ export const registerCrudRoutes = (fastify: FastifyInstance) => {
 
     const { limit, offset } = parsedQuery.data;
     const result = await pool.query(
-      "SELECT * FROM run_results WHERE run_id = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3",
+      `SELECT run_results.*, cases.prompt, cases.expected_outcome, cases.expected_notes
+       FROM run_results
+       JOIN cases ON cases.id = run_results.case_id
+       WHERE run_results.run_id = $1
+       ORDER BY run_results.created_at ASC
+       LIMIT $2 OFFSET $3`,
       [parsedParams.data.id, limit, offset]
     );
     return { data: result.rows };
@@ -514,79 +718,88 @@ export const registerCrudRoutes = (fastify: FastifyInstance) => {
             )
           ).rows[0].id;
 
-    const runInsert = await pool.query(
-      "INSERT INTO runs (suite_id, model_id, status) VALUES ($1, $2, $3) RETURNING id, status",
-      [suite_id, modelId, "running"]
+    const caseResult = await pool.query(
+      "SELECT id, prompt, expected_outcome FROM cases WHERE suite_id = $1 ORDER BY created_at ASC",
+      [suite_id]
     );
-    const runId = runInsert.rows[0].id as string;
+    const totalCases = caseResult.rows.length;
 
-    try {
-      const caseResult = await pool.query(
-        "SELECT id, prompt, expected_outcome FROM cases WHERE suite_id = $1 ORDER BY created_at ASC",
-        [suite_id]
-      );
+    const runInsert = await pool.query(
+      "INSERT INTO runs (suite_id, model_id, status, total_cases, completed_cases, passed_cases, failed_cases) VALUES ($1, $2, $3, $4, 0, 0, 0) RETURNING *",
+      [suite_id, modelId, "running", totalCases]
+    );
+    const run = runInsert.rows[0];
+    const runId = run.id as string;
 
-      let passedCount = 0;
-
-      for (const testCase of caseResult.rows) {
-        const expected = String(testCase.expected_outcome ?? "").toLowerCase();
-        const expectBlock = expected === "block";
-
-        // Reuse the same policy pipeline the external API route uses.
-        const response = await fastify.inject({
-          method: "POST",
-          url: "/v1/chat/completions",
-          payload: {
-            model: model_name,
-            messages: [{ role: "user", content: testCase.prompt }]
-          },
-          headers: { "Content-Type": "application/json" }
-        });
-
-        const payload = safeJsonParse(response.payload);
-        const blocked = response.statusCode === 403 && payload?.error === "blocked_by_policy";
-        const allowed = response.statusCode >= 200 && response.statusCode < 300 && !payload?.error;
-        const passed = expectBlock ? blocked : allowed;
-        if (passed) {
-          passedCount += 1;
-        }
-
-        const violations = parseViolations(payload, response.headers);
-        const outputText = payload ? extractOutputText(payload) : "";
-        const responseExcerpt = outputText ? truncateText(outputText) : null;
-
-        await pool.query(
-          "INSERT INTO run_results (run_id, case_id, passed, violations, response_excerpt) VALUES ($1, $2, $3, $4::jsonb, $5)",
-          [
+    const executeRun = async () => {
+      try {
+        if (totalCases === 0) {
+          await pool.query("UPDATE runs SET status = $2, completed_at = NOW() WHERE id = $1", [
             runId,
-            testCase.id,
-            passed,
-            violations ? JSON.stringify(violations) : null,
-            responseExcerpt
-          ]
-        );
-      }
-
-      await pool.query("UPDATE runs SET status = $2, completed_at = NOW() WHERE id = $1", [
-        runId,
-        "completed"
-      ]);
-
-      return {
-        id: runId,
-        status: "completed",
-        totals: {
-          total: caseResult.rows.length,
-          passed: passedCount,
-          failed: caseResult.rows.length - passedCount
+            "completed"
+          ]);
+          return;
         }
-      };
-    } catch (error) {
-      await pool.query("UPDATE runs SET status = $2, completed_at = NOW() WHERE id = $1", [
-        runId,
-        "failed"
-      ]);
-      throw error;
-    }
+
+        for (const testCase of caseResult.rows) {
+          const expected = String(testCase.expected_outcome ?? "").toLowerCase();
+          const expectBlock = expected === "block";
+
+          // Reuse the same policy pipeline the external API route uses.
+          const response = await fastify.inject({
+            method: "POST",
+            url: "/v1/chat/completions",
+            payload: {
+              model: model_name,
+              messages: [{ role: "user", content: testCase.prompt }]
+            },
+            headers: { "Content-Type": "application/json" }
+          });
+
+          const payload = safeJsonParse(response.payload);
+          const blocked = response.statusCode === 403 && payload?.error === "blocked_by_policy";
+          const allowed = response.statusCode >= 200 && response.statusCode < 300 && !payload?.error;
+          const passed = expectBlock ? blocked : allowed;
+
+          const violations = parseViolations(payload, response.headers);
+          const outputText = payload ? extractOutputText(payload) : "";
+          const responseExcerpt = outputText ? truncateText(outputText) : null;
+
+          await pool.query(
+            "INSERT INTO run_results (run_id, case_id, passed, violations, response_excerpt) VALUES ($1, $2, $3, $4::jsonb, $5)",
+            [
+              runId,
+              testCase.id,
+              passed,
+              violations ? JSON.stringify(violations) : null,
+              responseExcerpt
+            ]
+          );
+
+          await pool.query(
+            "UPDATE runs SET completed_cases = completed_cases + 1, passed_cases = passed_cases + $2, failed_cases = failed_cases + $3 WHERE id = $1",
+            [runId, passed ? 1 : 0, passed ? 0 : 1]
+          );
+        }
+
+        await pool.query("UPDATE runs SET status = $2, completed_at = NOW() WHERE id = $1", [
+          runId,
+          "completed"
+        ]);
+      } catch (error) {
+        await pool.query("UPDATE runs SET status = $2, completed_at = NOW() WHERE id = $1", [
+          runId,
+          "failed"
+        ]);
+        fastify.log.error({ error, runId }, "run execution failed");
+      }
+    };
+
+    setImmediate(() => {
+      void executeRun();
+    });
+
+    reply.code(202);
+    return run;
   });
 };
